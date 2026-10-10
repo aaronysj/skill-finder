@@ -1,0 +1,237 @@
+import {
+  Action,
+  ActionPanel,
+  Clipboard,
+  closeMainWindow,
+  getPreferenceValues,
+  Icon,
+  Keyboard,
+  List,
+  showHUD,
+  useNavigation,
+} from "@raycast/api";
+import { showFailureToast, usePromise } from "@raycast/utils";
+import fs from "node:fs";
+import { useMemo } from "react";
+import { getRoots } from "./dirs";
+import { ImportRepo } from "./import-repo";
+import { ManageDirectories } from "./manage-directories";
+import { loadSkills, Skill } from "./skills";
+import {
+  PINS_KEY,
+  rankSkills,
+  readJSON,
+  recordUse,
+  SkillUsage,
+  togglePinned,
+  USAGE_KEY,
+} from "./usage";
+
+interface Preferences {
+  skillsDirs: string;
+}
+
+function copyText(skill: Skill): string {
+  return `${skill.dir}\nNote: If this skill references other skills, find them in its sibling directory.`;
+}
+
+export default function Command() {
+  const { skillsDirs } = getPreferenceValues<Preferences>();
+  const { push } = useNavigation();
+  const {
+    data: roots = [],
+    isLoading: isLoadingRoots,
+    revalidate: revalidateRoots,
+  } = usePromise((raw: string) => getRoots(raw), [skillsDirs]);
+  const {
+    data: skills = [],
+    isLoading: isLoadingSkills,
+    revalidate: revalidateSkills,
+  } = usePromise(
+    async (entries: typeof roots) => {
+      try {
+        return loadSkills(entries.map((e) => e.dir));
+      } catch (error) {
+        await showFailureToast(error, { title: "Failed to scan skills" });
+        return [];
+      }
+    },
+    [roots],
+  );
+  const {
+    data: usage = {},
+    mutate: mutateUsage,
+    isLoading: isLoadingUsage,
+  } = usePromise(() => readJSON<SkillUsage>(USAGE_KEY, {}));
+  const {
+    data: pins = [],
+    mutate: mutatePins,
+    isLoading: isLoadingPins,
+  } = usePromise(() => readJSON<string[]>(PINS_KEY, []));
+
+  const { pinned, frequent, rest } = useMemo(
+    () => rankSkills(skills, usage, pins),
+    [skills, usage, pins],
+  );
+
+  const refresh = () => {
+    revalidateRoots();
+    revalidateSkills();
+  };
+
+  const use = (skill: Skill) => mutateUsage(recordUse(skill.dir));
+
+  const copyPathWithNote = async (skill: Skill) => {
+    await use(skill);
+    await Clipboard.copy(copyText(skill));
+    await closeMainWindow();
+    await showHUD(`Copied ${skill.name}`);
+  };
+  const pastePathWithNote = async (skill: Skill) => {
+    await use(skill);
+    await Clipboard.paste(copyText(skill));
+    await closeMainWindow();
+  };
+  const copyFolder = async (skill: Skill) => {
+    await use(skill);
+    await Clipboard.copy({ file: skill.dir });
+    await closeMainWindow();
+    await showHUD(`Copied folder ${skill.name}`);
+  };
+  const copySkillContent = async (skill: Skill) => {
+    await use(skill);
+    await Clipboard.copy(fs.readFileSync(skill.file, "utf8"));
+    await closeMainWindow();
+    await showHUD(`Copied SKILL.md of ${skill.name}`);
+  };
+
+  const manageActions = (
+    <ActionPanel.Section title="Directories">
+      <Action
+        title="Manage Directories…"
+        icon={Icon.Gear}
+        shortcut={{ modifiers: ["cmd"], key: "d" }}
+        onAction={() =>
+          push(<ManageDirectories roots={roots} onChanged={refresh} />)
+        }
+      />
+      <Action
+        title="Import Skills Repo…"
+        icon={Icon.Download}
+        shortcut={{ modifiers: ["cmd"], key: "i" }}
+        onAction={() => push(<ImportRepo roots={roots} onImported={refresh} />)}
+      />
+      <Action
+        title="Refresh"
+        icon={Icon.ArrowClockwise}
+        shortcut={Keyboard.Shortcut.Common.Refresh}
+        onAction={refresh}
+      />
+    </ActionPanel.Section>
+  );
+
+  const renderItem = (skill: Skill, isPinned: boolean) => (
+    <List.Item
+      key={skill.dir}
+      title={skill.name}
+      icon={isPinned ? Icon.Pin : undefined}
+      keywords={[skill.name, skill.description, skill.group, skill.dir]}
+      detail={
+        <List.Item.Detail
+          markdown={
+            (skill.body ||
+              `# ${skill.name}\n\n${skill.description || "*No content*"}`) +
+            `\n\n---\n\n- **Directory** \`${skill.dir}\`\n- **Used** ${usage[skill.dir] ?? 0}×`
+          }
+        />
+      }
+      actions={
+        <ActionPanel>
+          <ActionPanel.Section title="Copy">
+            <Action
+              title="Copy Path with Note"
+              icon={Icon.Clipboard}
+              onAction={() => copyPathWithNote(skill)}
+            />
+            <Action
+              title="Paste Path with Note into Active App"
+              icon={Icon.Clipboard}
+              shortcut={{ modifiers: ["cmd", "opt"], key: "v" }}
+              onAction={() => pastePathWithNote(skill)}
+            />
+            <Action
+              title="Copy Folder as File"
+              icon={Icon.Folder}
+              shortcut={Keyboard.Shortcut.Common.Copy}
+              onAction={() => copyFolder(skill)}
+            />
+            <Action
+              title="Copy SKILL.md Content"
+              icon={Icon.TextDocument}
+              shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
+              onAction={() => copySkillContent(skill)}
+            />
+            <Action.CopyToClipboard
+              title="Copy Path Only"
+              content={skill.dir}
+              shortcut={Keyboard.Shortcut.Common.CopyName}
+            />
+          </ActionPanel.Section>
+          <ActionPanel.Section title="Organize">
+            <Action
+              title={isPinned ? "Unpin" : "Pin"}
+              icon={isPinned ? Icon.PinDisabled : Icon.Pin}
+              shortcut={Keyboard.Shortcut.Common.Pin}
+              onAction={() => mutatePins(togglePinned(skill.dir))}
+            />
+          </ActionPanel.Section>
+          <ActionPanel.Section title="Open">
+            <Action.ShowInFinder path={skill.dir} />
+            <Action.Open title="Open SKILL.md" target={skill.file} />
+          </ActionPanel.Section>
+          {manageActions}
+        </ActionPanel>
+      }
+    />
+  );
+
+  return (
+    <List
+      isLoading={
+        isLoadingRoots || isLoadingSkills || isLoadingUsage || isLoadingPins
+      }
+      isShowingDetail
+      searchBarPlaceholder="Search skills by name or description…"
+    >
+      {skills.length === 0 && !isLoadingSkills ? (
+        <List.EmptyView
+          title="No skills found"
+          description={
+            roots.length === 0
+              ? "No directories configured. Press ⌘D to add a skills directory."
+              : `No SKILL.md found in the configured directories. Press ⌘R to rescan, or ⌘D to change directories.`
+          }
+          actions={<ActionPanel>{manageActions}</ActionPanel>}
+        />
+      ) : (
+        <>
+          {pinned.length > 0 && (
+            <List.Section title="Pinned">
+              {pinned.map((s) => renderItem(s, true))}
+            </List.Section>
+          )}
+          {frequent.length > 0 && (
+            <List.Section title="Frequently Used">
+              {frequent.map((s) => renderItem(s, false))}
+            </List.Section>
+          )}
+          {rest.length > 0 && (
+            <List.Section title="All Skills">
+              {rest.map((s) => renderItem(s, false))}
+            </List.Section>
+          )}
+        </>
+      )}
+    </List>
+  );
+}

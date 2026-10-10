@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="doc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0e7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- stacked document -->
+  <g transform="rotate(-4 256 240)">
+    <rect x="118" y="96" width="240" height="300" rx="20" fill="#ffffff" opacity="0.25"/>
+    <rect x="132" y="82" width="240" height="300" rx="20" fill="#ffffff" opacity="0.5"/>
+    <rect x="146" y="68" width="240" height="300" rx="20" fill="url(#doc)"/>
+    <!-- text lines -->
+    <rect x="176" y="112" width="130" height="20" rx="10" fill="#818cf8"/>
+    <rect x="176" y="152" width="180" height="14" rx="7" fill="#c7d2fe"/>
+    <rect x="176" y="182" width="150" height="14" rx="7" fill="#c7d2fe"/>
+    <rect x="176" y="212" width="180" height="14" rx="7" fill="#c7d2fe"/>
+    <rect x="176" y="242" width="100" height="14" rx="7" fill="#c7d2fe"/>
+    <!-- folded corner -->
+    <path d="M346 68 L386 108 L366 108 Q346 108 346 88 Z" fill="#c7d2fe"/>
+  </g>
+  <!-- magnifier -->
+  <circle cx="302" cy="290" r="98" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-width="30"/>
+  <rect x="376" y="362" width="130" height="42" rx="21" transform="rotate(45 376 362)" fill="#ffffff"/>
+</svg>
