@@ -140,7 +140,7 @@ export default function Command(props: LaunchProps) {
       <List.Item
         key={skill.dir}
         title={skill.name}
-        icon={icon}
+        accessories={isPinned ? [{ icon: "📌", tooltip: "Pinned" }] : []}
         keywords={[skill.name, skill.description, skill.group, skill.dir]}
         detail={
           <List.Item.Detail
@@ -224,7 +224,7 @@ export default function Command(props: LaunchProps) {
         <>
           {pinned.length > 0 && (
             <List.Section title="Pinned" subtitle={String(pinned.length)}>
-              {pinned.map((s) => renderItem(s, "📌"))}
+              {pinned.map((s) => renderItem(s))}
             </List.Section>
           )}
           {frequent.length > 0 && (
