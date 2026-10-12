@@ -158,7 +158,10 @@ export function ManageDirectories({
     try {
       await closeMainWindow({ clearRootSearch: true });
       const dir = await pickDirectory();
-      if (dir) await addExtraDir(dir);
+      if (dir) {
+        await addExtraDir(dir);
+        changed();
+      }
     } catch (error) {
       await showFailureToast(error, { title: "Failed to add directory" });
     }
