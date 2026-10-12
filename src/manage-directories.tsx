@@ -43,9 +43,11 @@ const tildify = (p: string) => {
 
 async function pickDirectory(): Promise<string | undefined> {
   try {
-    const out = await runAppleScript(
-      'POSIX path of (choose folder with prompt "Choose a skills directory")',
-    );
+    const out = await runAppleScript(`tell application "Finder"
+  activate
+  set f to choose folder with prompt "Choose a skills directory"
+end tell
+POSIX path of f`);
     return out.trim().replace(/\/$/, "") || undefined;
   } catch (error) {
     if (String(error).includes("-128")) return undefined;
