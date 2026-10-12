@@ -134,7 +134,7 @@ export default function Command(props: LaunchProps) {
     </ActionPanel.Section>
   );
 
-  const renderItem = (skill: Skill, icon?: List.Item.Props["icon"]) => {
+  const renderItem = (skill: Skill) => {
     const isPinned = pins.includes(skill.dir);
     return (
       <List.Item
