@@ -9,9 +9,13 @@ import {
   showToast,
   Toast,
   Clipboard,
+  closeMainWindow,
   getSelectedFinderItems,
+  Keyboard,
+  launchCommand,
+  LaunchType,
 } from "@raycast/api";
-import { showFailureToast, usePromise } from "@raycast/utils";
+import { runAppleScript, showFailureToast, usePromise } from "@raycast/utils";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,6 +45,20 @@ const isDir = (p: string) => {
     return false;
   }
 };
+
+async function pickDirectory(): Promise<string | undefined> {
+  try {
+    const out = await runAppleScript(`tell application "Finder"
+  activate
+  set f to choose folder with prompt "Choose a skills directory"
+end tell
+POSIX path of f`);
+    return out.trim().replace(/\/$/, "") || undefined;
+  } catch (error) {
+    if (String(error).includes("-128")) return undefined;
+    throw error;
+  }
+}
 
 export function ManageDirectories({
   skillsDirs,
@@ -136,6 +154,21 @@ export function ManageDirectories({
     }
   };
 
+  const browse = async () => {
+    try {
+      await closeMainWindow({ clearRootSearch: true });
+      const dir = await pickDirectory();
+      if (dir) await addExtraDir(dir);
+    } catch (error) {
+      await showFailureToast(error, { title: "Failed to add directory" });
+    }
+    await launchCommand({
+      name: "search-skills",
+      type: LaunchType.UserInitiated,
+      context: { page: "manage" },
+    });
+  };
+
   const remove = async (dir: string) => {
     if (
       !(await confirmAlert({
@@ -178,6 +211,12 @@ export function ManageDirectories({
       actions={
         <ActionPanel>
           <Action.ShowInFinder path={root.dir} />
+          <Action
+            title="Add Directory…"
+            icon={Icon.Plus}
+            shortcut={Keyboard.Shortcut.Common.New}
+            onAction={browse}
+          />
           {root.source === "custom" && (
             <Action
               title="Remove Directory"
@@ -274,8 +313,22 @@ export function ManageDirectories({
           )}
         </List.Section>
       )}
-      {!repoUrl && !pathInput && !query && addable.length > 0 && (
+      {!repoUrl && !pathInput && !query && (
         <List.Section title="Add">
+          <List.Item
+            icon={{ source: Icon.PlusCircle, tintColor: Color.Purple }}
+            title="Add Directory…"
+            subtitle="Choose a folder to scan for skills"
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Choose Folder…"
+                  icon={Icon.Folder}
+                  onAction={browse}
+                />
+              </ActionPanel>
+            }
+          />
           {addable.map(({ dir, from }) => (
             <List.Item
               key={dir}

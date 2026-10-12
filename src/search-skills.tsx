@@ -6,13 +6,14 @@ import {
   getPreferenceValues,
   Icon,
   Keyboard,
+  LaunchProps,
   List,
   showHUD,
   useNavigation,
 } from "@raycast/api";
 import { showFailureToast, usePromise } from "@raycast/utils";
 import fs from "node:fs";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { getRoots } from "./dirs";
 import { ManageDirectories } from "./manage-directories";
 import { loadSkills, Skill, tildify } from "./skills";
@@ -37,7 +38,7 @@ function copyText(skill: Skill): string {
   ].join("\n");
 }
 
-export default function Command() {
+export default function Command(props: LaunchProps) {
   const { skillsDirs } = getPreferenceValues<Preferences>();
   const { push } = useNavigation();
   const {
@@ -75,6 +76,11 @@ export default function Command() {
     () => rankSkills(skills, usage, pins),
     [skills, usage, pins],
   );
+
+  useEffect(() => {
+    if (props.launchContext?.page === "manage")
+      push(<ManageDirectories skillsDirs={skillsDirs} onChanged={refresh} />);
+  }, []);
 
   const refresh = () => {
     revalidateRoots();
