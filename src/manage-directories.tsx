@@ -8,16 +8,16 @@ import {
   List,
   showToast,
   Toast,
-  Keyboard,
+  getSelectedFinderItems,
 } from "@raycast/api";
-import { runAppleScript, showFailureToast, usePromise } from "@raycast/utils";
+import { showFailureToast, usePromise } from "@raycast/utils";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { useState } from "react";
 import { promisify } from "node:util";
 import { addExtraDir, getRoots, removeExtraDir, RootEntry } from "./dirs";
-import { loadSkills, tildify } from "./skills";
+import { expandHome, loadSkills, tildify } from "./skills";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,19 +33,13 @@ interface RootInfo extends RootEntry {
   count: number;
 }
 
-async function pickDirectory(): Promise<string | undefined> {
+const isDir = (p: string) => {
   try {
-    const out = await runAppleScript(`tell application "Finder"
-  activate
-  set f to choose folder with prompt "Choose a skills directory"
-end tell
-POSIX path of f`);
-    return out.trim().replace(/\/$/, "") || undefined;
-  } catch (error) {
-    if (String(error).includes("-128")) return undefined;
-    throw error;
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
   }
-}
+};
 
 export function ManageDirectories({
   skillsDirs,
@@ -70,8 +64,17 @@ export function ManageDirectories({
     [skillsDirs],
   );
 
+  const { data: finderDirs = [] } = usePromise(() =>
+    getSelectedFinderItems()
+      .then((items) => items.map((i) => i.path).filter(isDir))
+      .catch(() => [] as string[]),
+  );
+
   const [searchText, setSearchText] = useState("");
   const query = searchText.trim();
+  const pathInput = /^[/~]/.test(query)
+    ? path.resolve(expandHome(query))
+    : undefined;
   const repoUrl = GIT_URL.test(query) ? query : undefined;
   const repo = repoUrl ? repoName(repoUrl) : null;
   const cloneTargets = roots.filter((r) => r.exists);
@@ -110,16 +113,15 @@ export function ManageDirectories({
     onChanged();
   };
 
-  const add = async () => {
+  const add = async (dir: string) => {
     try {
-      const dir = await pickDirectory();
-      if (!dir) return;
       await addExtraDir(dir);
       await showToast({
         style: Toast.Style.Success,
         title: "Directory added",
         message: tildify(dir),
       });
+      setSearchText("");
       changed();
     } catch (error) {
       await showFailureToast(error, { title: "Failed to add directory" });
@@ -168,12 +170,6 @@ export function ManageDirectories({
       actions={
         <ActionPanel>
           <Action.ShowInFinder path={root.dir} />
-          <Action
-            title="Add Directory…"
-            icon={Icon.Plus}
-            shortcut={Keyboard.Shortcut.Common.New}
-            onAction={add}
-          />
           {root.source === "custom" && (
             <Action
               title="Remove Directory"
@@ -188,9 +184,12 @@ export function ManageDirectories({
     />
   );
 
-  const visible = repoUrl
-    ? []
-    : roots.filter((r) => r.dir.toLowerCase().includes(query.toLowerCase()));
+  const known = new Set(roots.map((r) => r.dir));
+  const addable = finderDirs.filter((d) => !known.has(d));
+  const visible =
+    repoUrl || pathInput
+      ? []
+      : roots.filter((r) => r.dir.toLowerCase().includes(query.toLowerCase()));
   const preference = visible.filter((r) => r.source === "preference");
   const custom = visible.filter((r) => r.source === "custom");
 
@@ -201,7 +200,7 @@ export function ManageDirectories({
       filtering={false}
       searchText={searchText}
       onSearchTextChange={setSearchText}
-      searchBarPlaceholder="Filter directories, or paste a git URL to import a skills repo…"
+      searchBarPlaceholder="Paste a folder path or git URL, or filter…"
     >
       {repoUrl && (
         <List.Section title="Import">
@@ -229,18 +228,66 @@ export function ManageDirectories({
           />
         </List.Section>
       )}
-      <List.Section>
-        <List.Item
-          icon={{ source: Icon.PlusCircle, tintColor: Color.Purple }}
-          title="Add Directory…"
-          subtitle="Pick a folder to scan for SKILL.md"
-          actions={
-            <ActionPanel>
-              <Action title="Choose Folder…" icon={Icon.Plus} onAction={add} />
-            </ActionPanel>
-          }
-        />
-      </List.Section>
+      {pathInput && (
+        <List.Section title="Add">
+          {!isDir(pathInput) ? (
+            <List.Item
+              icon={{ source: Icon.ExclamationMark, tintColor: Color.Red }}
+              title="Not a directory"
+              subtitle={tildify(pathInput)}
+            />
+          ) : known.has(pathInput) ? (
+            <List.Item
+              icon={{ source: Icon.CheckCircle, tintColor: Color.Green }}
+              title="Already added"
+              subtitle={tildify(pathInput)}
+            />
+          ) : (
+            <List.Item
+              icon={{ source: Icon.PlusCircle, tintColor: Color.Purple }}
+              title={`Add ${path.basename(pathInput) || pathInput}`}
+              subtitle={tildify(path.dirname(pathInput))}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Add Directory"
+                    icon={Icon.Plus}
+                    onAction={() => add(pathInput)}
+                  />
+                </ActionPanel>
+              }
+            />
+          )}
+        </List.Section>
+      )}
+      {!repoUrl && !pathInput && (
+        <List.Section title="Add">
+          {addable.map((dir) => (
+            <List.Item
+              key={dir}
+              icon={{ source: Icon.PlusCircle, tintColor: Color.Purple }}
+              title={`Add ${path.basename(dir)}`}
+              subtitle={`Selected in Finder · ${tildify(path.dirname(dir))}`}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Add Finder Selection"
+                    icon={Icon.Plus}
+                    onAction={() => add(dir)}
+                  />
+                </ActionPanel>
+              }
+            />
+          ))}
+          {addable.length === 0 && !query && (
+            <List.Item
+              icon={{ source: Icon.PlusCircle, tintColor: Color.SecondaryText }}
+              title="Add a directory"
+              subtitle="Paste a path in the search bar, or select a folder in Finder first"
+            />
+          )}
+        </List.Section>
+      )}
       {custom.length > 0 && (
         <List.Section title="Custom" subtitle={String(custom.length)}>
           {custom.map(renderRoot)}
