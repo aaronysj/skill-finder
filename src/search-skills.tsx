@@ -15,7 +15,7 @@ import fs from "node:fs";
 import { useMemo } from "react";
 import { getRoots } from "./dirs";
 import { ManageDirectories } from "./manage-directories";
-import { loadSkills, Skill } from "./skills";
+import { loadSkills, Skill, tildify } from "./skills";
 import {
   PINS_KEY,
   rankSkills,
@@ -32,7 +32,7 @@ interface Preferences {
 
 function copyText(skill: Skill): string {
   return [
-    `Read ${skill.file} and follow the skill it defines.`,
+    `Read ${tildify(skill.file)} and follow the skill it defines.`,
     `If it refers to related skills, find them in its sibling directories.`,
   ].join("\n");
 }

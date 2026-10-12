@@ -20,6 +20,13 @@ export function expandHome(p: string): string {
   return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
 }
 
+export function tildify(p: string): string {
+  const home = os.homedir();
+  return p === home || p.startsWith(home + path.sep)
+    ? "~" + p.slice(home.length)
+    : p;
+}
+
 export function loadSkills(roots: string[]): Skill[] {
   const skills: Skill[] = [];
   for (const raw of roots) {

@@ -13,12 +13,11 @@ import {
 import { runAppleScript, showFailureToast, usePromise } from "@raycast/utils";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { useState } from "react";
 import { promisify } from "node:util";
 import { addExtraDir, getRoots, removeExtraDir, RootEntry } from "./dirs";
-import { loadSkills } from "./skills";
+import { loadSkills, tildify } from "./skills";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,13 +32,6 @@ interface RootInfo extends RootEntry {
   exists: boolean;
   count: number;
 }
-
-const tildify = (p: string) => {
-  const home = os.homedir();
-  return p === home || p.startsWith(home + path.sep)
-    ? "~" + p.slice(home.length)
-    : p;
-};
 
 async function pickDirectory(): Promise<string | undefined> {
   try {
