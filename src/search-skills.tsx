@@ -2,7 +2,6 @@ import {
   Action,
   ActionPanel,
   Clipboard,
-  Color,
   closeMainWindow,
   getPreferenceValues,
   Icon,
@@ -225,12 +224,7 @@ export default function Command(props: LaunchProps) {
         <>
           {pinned.length > 0 && (
             <List.Section title="Pinned" subtitle={String(pinned.length)}>
-              {pinned.map((s) =>
-                renderItem(s, {
-                  source: Icon.Pin,
-                  tintColor: Color.Orange,
-                }),
-              )}
+              {pinned.map((s) => renderItem(s, "📌"))}
             </List.Section>
           )}
           {frequent.length > 0 && (
@@ -238,12 +232,7 @@ export default function Command(props: LaunchProps) {
               title="Frequently Used"
               subtitle={String(frequent.length)}
             >
-              {frequent.map((s) =>
-                renderItem(s, {
-                  source: Icon.Star,
-                  tintColor: Color.Yellow,
-                }),
-              )}
+              {frequent.map((s) => renderItem(s))}
             </List.Section>
           )}
           {rest.length > 0 && (
