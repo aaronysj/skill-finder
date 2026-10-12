@@ -41,20 +41,25 @@ export function togglePinned(dir: string): Promise<string[]> {
   );
 }
 
-/** Pinned skills keep their pin order; used skills are sorted by use count (desc), then by name. */
+export const TOP_LIMIT = 5;
+
+/** Pinned skills keep their pin order; used skills are sorted by use count (desc), then by name. Each top section holds at most TOP_LIMIT; overflow falls back into `rest`. */
 export function rankSkills(
   skills: Skill[],
   usage: SkillUsage,
   pinnedDirs: string[],
 ) {
   const byDir = new Map(skills.map((s) => [s.dir, s]));
-  const pinned = pinnedDirs.flatMap((dir) => byDir.get(dir) ?? []);
-  const pinnedSet = new Set(pinnedDirs);
+  const allPinned = pinnedDirs.flatMap((dir) => byDir.get(dir) ?? []);
+  const pinnedSet = new Set(allPinned.map((s) => s.dir));
   const unpinned = skills.filter((s) => !pinnedSet.has(s.dir));
   const uses = (s: Skill) => usage[s.dir] ?? 0;
-  const frequent = unpinned
+  const allFrequent = unpinned
     .filter((s) => uses(s) > 0)
     .sort((a, b) => uses(b) - uses(a) || a.name.localeCompare(b.name));
-  const rest = unpinned.filter((s) => uses(s) === 0);
+  const pinned = allPinned.slice(0, TOP_LIMIT);
+  const frequent = allFrequent.slice(0, TOP_LIMIT);
+  const shown = new Set([...pinned, ...frequent].map((s) => s.dir));
+  const rest = skills.filter((s) => !shown.has(s.dir));
   return { pinned, frequent, rest };
 }

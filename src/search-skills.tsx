@@ -2,6 +2,7 @@ import {
   Action,
   ActionPanel,
   Clipboard,
+  Color,
   closeMainWindow,
   getPreferenceValues,
   Icon,
@@ -134,70 +135,73 @@ export default function Command(props: LaunchProps) {
     </ActionPanel.Section>
   );
 
-  const renderItem = (skill: Skill, isPinned: boolean) => (
-    <List.Item
-      key={skill.dir}
-      title={skill.name}
-      icon={isPinned ? Icon.Pin : undefined}
-      keywords={[skill.name, skill.description, skill.group, skill.dir]}
-      detail={
-        <List.Item.Detail
-          markdown={
-            (skill.body ||
-              `# ${skill.name}\n\n${skill.description || "*No content*"}`) +
-            `\n\n---\n\n- **Directory** \`${skill.dir}\`\n- **Used** ${usage[skill.dir] ?? 0}×`
-          }
-        />
-      }
-      actions={
-        <ActionPanel>
-          <ActionPanel.Section title="Copy">
-            <Action
-              title="Copy Skill Prompt"
-              icon={Icon.Clipboard}
-              onAction={() => copyPathWithNote(skill)}
-            />
-            <Action
-              title="Paste Skill Prompt into Active App"
-              icon={Icon.Clipboard}
-              shortcut={{ modifiers: ["cmd", "opt"], key: "v" }}
-              onAction={() => pastePathWithNote(skill)}
-            />
-            <Action
-              title="Copy Folder as File"
-              icon={Icon.Folder}
-              shortcut={Keyboard.Shortcut.Common.Copy}
-              onAction={() => copyFolder(skill)}
-            />
-            <Action
-              title="Copy SKILL.md Content"
-              icon={Icon.TextDocument}
-              shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
-              onAction={() => copySkillContent(skill)}
-            />
-            <Action.CopyToClipboard
-              title="Copy Path Only"
-              content={skill.dir}
-              shortcut={Keyboard.Shortcut.Common.CopyName}
-            />
-          </ActionPanel.Section>
-          <ActionPanel.Section title="Organize">
-            <Action
-              title={isPinned ? "Unpin" : "Pin"}
-              icon={isPinned ? Icon.PinDisabled : Icon.Pin}
-              shortcut={Keyboard.Shortcut.Common.Pin}
-              onAction={() => mutatePins(togglePinned(skill.dir))}
-            />
-          </ActionPanel.Section>
-          <ActionPanel.Section title="Open">
-            <Action.ShowInFinder path={skill.dir} />
-            <Action.Open title="Open SKILL.md" target={skill.file} />
-          </ActionPanel.Section>
-          {manageActions}
-        </ActionPanel>
-      }
-    />
-  );
+  const renderItem = (skill: Skill, icon?: List.Item.Props["icon"]) => {
+    const isPinned = pins.includes(skill.dir);
+    return (
+      <List.Item
+        key={skill.dir}
+        title={skill.name}
+        icon={icon}
+        keywords={[skill.name, skill.description, skill.group, skill.dir]}
+        detail={
+          <List.Item.Detail
+            markdown={
+              (skill.body ||
+                `# ${skill.name}\n\n${skill.description || "*No content*"}`) +
+              `\n\n---\n\n- **Directory** \`${skill.dir}\`\n- **Used** ${usage[skill.dir] ?? 0}×`
+            }
+          />
+        }
+        actions={
+          <ActionPanel>
+            <ActionPanel.Section title="Copy">
+              <Action
+                title="Copy Skill Prompt"
+                icon={Icon.Clipboard}
+                onAction={() => copyPathWithNote(skill)}
+              />
+              <Action
+                title="Paste Skill Prompt into Active App"
+                icon={Icon.Clipboard}
+                shortcut={{ modifiers: ["cmd", "opt"], key: "v" }}
+                onAction={() => pastePathWithNote(skill)}
+              />
+              <Action
+                title="Copy Folder as File"
+                icon={Icon.Folder}
+                shortcut={Keyboard.Shortcut.Common.Copy}
+                onAction={() => copyFolder(skill)}
+              />
+              <Action
+                title="Copy SKILL.md Content"
+                icon={Icon.TextDocument}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
+                onAction={() => copySkillContent(skill)}
+              />
+              <Action.CopyToClipboard
+                title="Copy Path Only"
+                content={skill.dir}
+                shortcut={Keyboard.Shortcut.Common.CopyName}
+              />
+            </ActionPanel.Section>
+            <ActionPanel.Section title="Organize">
+              <Action
+                title={isPinned ? "Unpin" : "Pin"}
+                icon={isPinned ? Icon.PinDisabled : Icon.Pin}
+                shortcut={Keyboard.Shortcut.Common.Pin}
+                onAction={() => mutatePins(togglePinned(skill.dir))}
+              />
+            </ActionPanel.Section>
+            <ActionPanel.Section title="Open">
+              <Action.ShowInFinder path={skill.dir} />
+              <Action.Open title="Open SKILL.md" target={skill.file} />
+            </ActionPanel.Section>
+            {manageActions}
+          </ActionPanel>
+        }
+      />
+    );
+  };
 
   return (
     <List
@@ -220,18 +224,31 @@ export default function Command(props: LaunchProps) {
       ) : (
         <>
           {pinned.length > 0 && (
-            <List.Section title="Pinned">
-              {pinned.map((s) => renderItem(s, true))}
+            <List.Section title="Pinned" subtitle={String(pinned.length)}>
+              {pinned.map((s) =>
+                renderItem(s, {
+                  source: Icon.Pin,
+                  tintColor: Color.Orange,
+                }),
+              )}
             </List.Section>
           )}
           {frequent.length > 0 && (
-            <List.Section title="Frequently Used">
-              {frequent.map((s) => renderItem(s, false))}
+            <List.Section
+              title="Frequently Used"
+              subtitle={String(frequent.length)}
+            >
+              {frequent.map((s) =>
+                renderItem(s, {
+                  source: Icon.Star,
+                  tintColor: Color.Yellow,
+                }),
+              )}
             </List.Section>
           )}
           {rest.length > 0 && (
-            <List.Section title="All Skills">
-              {rest.map((s) => renderItem(s, false))}
+            <List.Section title="All Skills" subtitle={String(rest.length)}>
+              {rest.map((s) => renderItem(s))}
             </List.Section>
           )}
         </>
