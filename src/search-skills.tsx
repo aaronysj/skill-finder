@@ -14,7 +14,6 @@ import { showFailureToast, usePromise } from "@raycast/utils";
 import fs from "node:fs";
 import { useMemo } from "react";
 import { getRoots } from "./dirs";
-import { ImportRepo } from "./import-repo";
 import { ManageDirectories } from "./manage-directories";
 import { loadSkills, Skill } from "./skills";
 import {
@@ -32,7 +31,10 @@ interface Preferences {
 }
 
 function copyText(skill: Skill): string {
-  return `${skill.dir}\nNote: If this skill references other skills, find them in its sibling directory.`;
+  return [
+    `Read ${skill.file} and follow the skill it defines.`,
+    `If it refers to related skills, find them in its sibling directories.`,
+  ].join("\n");
 }
 
 export default function Command() {
@@ -108,18 +110,14 @@ export default function Command() {
   const manageActions = (
     <ActionPanel.Section title="Directories">
       <Action
-        title="Manage Directories…"
+        title="Manage Directories / Import Repo…"
         icon={Icon.Gear}
         shortcut={{ modifiers: ["cmd"], key: "d" }}
         onAction={() =>
-          push(<ManageDirectories roots={roots} onChanged={refresh} />)
+          push(
+            <ManageDirectories skillsDirs={skillsDirs} onChanged={refresh} />,
+          )
         }
-      />
-      <Action
-        title="Import Skills Repo…"
-        icon={Icon.Download}
-        shortcut={{ modifiers: ["cmd"], key: "i" }}
-        onAction={() => push(<ImportRepo roots={roots} onImported={refresh} />)}
       />
       <Action
         title="Refresh"
@@ -149,12 +147,12 @@ export default function Command() {
         <ActionPanel>
           <ActionPanel.Section title="Copy">
             <Action
-              title="Copy Path with Note"
+              title="Copy Skill Prompt"
               icon={Icon.Clipboard}
               onAction={() => copyPathWithNote(skill)}
             />
             <Action
-              title="Paste Path with Note into Active App"
+              title="Paste Skill Prompt into Active App"
               icon={Icon.Clipboard}
               shortcut={{ modifiers: ["cmd", "opt"], key: "v" }}
               onAction={() => pastePathWithNote(skill)}

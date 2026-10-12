@@ -17,7 +17,7 @@
     {
       "name": "search-skills",
       "title": "Search Skills",
-      "description": "Search skills by name or description; Enter copies the skill directory path plus a sibling-lookup note.",
+      "description": "Search skills by name or description; Enter copies a prompt telling an agent to load the skill and resolve related skills from its sibling directories.",
       "mode": "view"
     }
   ],
