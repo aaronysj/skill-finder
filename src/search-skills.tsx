@@ -3,6 +3,7 @@ import {
   ActionPanel,
   Clipboard,
   closeMainWindow,
+  Color,
   getPreferenceValues,
   Icon,
   Keyboard,
@@ -13,9 +14,10 @@ import {
 } from "@raycast/api";
 import { showFailureToast, usePromise } from "@raycast/utils";
 import fs from "node:fs";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getRoots } from "./dirs";
 import { ManageDirectories } from "./manage-directories";
+import { buildPrompt } from "./prompt";
 import { loadSkills, Skill, tildify } from "./skills";
 import {
   PINS_KEY,
@@ -29,13 +31,6 @@ import {
 
 interface Preferences {
   skillsDirs: string;
-}
-
-function copyText(skill: Skill): string {
-  return [
-    `Read ${tildify(skill.file)} and follow the skill it defines.`,
-    `If it refers to related skills, find them in its sibling directories.`,
-  ].join("\n");
 }
 
 export default function Command(props: LaunchProps) {
@@ -72,6 +67,20 @@ export default function Command(props: LaunchProps) {
     isLoading: isLoadingPins,
   } = usePromise(() => readJSON<string[]>(PINS_KEY, []));
 
+  const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
+  const selected = useMemo(
+    () => selectedDirs.flatMap((d) => skills.find((s) => s.dir === d) ?? []),
+    [selectedDirs, skills],
+  );
+  const isMulti = selected.length > 0;
+  const toggleSelected = (skill: Skill) =>
+    setSelectedDirs((cur) =>
+      cur.includes(skill.dir)
+        ? cur.filter((d) => d !== skill.dir)
+        : [...cur, skill.dir],
+    );
+  const clearSelected = () => setSelectedDirs([]);
+
   const { pinned, frequent, rest } = useMemo(
     () => rankSkills(skills, usage, pins),
     [skills, usage, pins],
@@ -89,15 +98,24 @@ export default function Command(props: LaunchProps) {
 
   const use = (skill: Skill) => mutateUsage(recordUse(skill.dir));
 
+  const promptTargets = (skill: Skill) => (isMulti ? selected : [skill]);
   const copyPathWithNote = async (skill: Skill) => {
-    await use(skill);
-    await Clipboard.copy(copyText(skill));
+    const targets = promptTargets(skill);
+    await Promise.all(targets.map(use));
+    await Clipboard.copy(buildPrompt(targets));
+    clearSelected();
     await closeMainWindow();
-    await showHUD(`Copied ${skill.name}`);
+    await showHUD(
+      targets.length > 1
+        ? `Copied prompt for ${targets.length} skills`
+        : `Copied ${targets[0].name}`,
+    );
   };
   const pastePathWithNote = async (skill: Skill) => {
-    await use(skill);
-    await Clipboard.paste(copyText(skill));
+    const targets = promptTargets(skill);
+    await Promise.all(targets.map(use));
+    await Clipboard.paste(buildPrompt(targets));
+    clearSelected();
     await closeMainWindow();
   };
   const copyFolder = async (skill: Skill) => {
@@ -136,10 +154,33 @@ export default function Command(props: LaunchProps) {
 
   const renderItem = (skill: Skill) => {
     const isPinned = pins.includes(skill.dir);
+    const isSelected = selectedDirs.includes(skill.dir);
+    const n = selected.length;
+    const copyTitle = isMulti
+      ? `Copy Prompt for ${n} Selected Skill${n > 1 ? "s" : ""}`
+      : "Copy Skill Prompt";
+    const pasteTitle = isMulti
+      ? `Paste Prompt for ${n} Selected Skill${n > 1 ? "s" : ""}`
+      : "Paste Skill Prompt into Active App";
+    const toggle = (
+      <Action
+        title={isSelected ? "Remove from Selection" : "Add to Selection"}
+        icon={isSelected ? Icon.MinusCircle : Icon.PlusCircle}
+        shortcut={{ modifiers: ["cmd"], key: "return" }}
+        onAction={() => toggleSelected(skill)}
+      />
+    );
     return (
       <List.Item
         key={skill.dir}
         title={skill.name}
+        icon={
+          isMulti
+            ? isSelected
+              ? { source: Icon.CheckCircle, tintColor: Color.Green }
+              : Icon.Circle
+            : undefined
+        }
         keywords={[skill.name, skill.description, skill.group, skill.dir]}
         detail={
           <List.Item.Detail
@@ -152,14 +193,15 @@ export default function Command(props: LaunchProps) {
         }
         actions={
           <ActionPanel>
-            <ActionPanel.Section title="Copy">
+            <ActionPanel.Section title={isMulti ? "Selection" : "Copy"}>
               <Action
-                title="Copy Skill Prompt"
+                title={copyTitle}
                 icon={Icon.Clipboard}
                 onAction={() => copyPathWithNote(skill)}
               />
+              {toggle}
               <Action
-                title="Paste Skill Prompt into Active App"
+                title={pasteTitle}
                 icon={Icon.Clipboard}
                 shortcut={{ modifiers: ["cmd", "opt"], key: "v" }}
                 onAction={() => pastePathWithNote(skill)}
@@ -181,6 +223,14 @@ export default function Command(props: LaunchProps) {
                 content={tildify(skill.dir)}
                 shortcut={Keyboard.Shortcut.Common.CopyName}
               />
+              {isMulti && (
+                <Action
+                  title="Clear Selection"
+                  icon={Icon.XMarkCircle}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "backspace" }}
+                  onAction={clearSelected}
+                />
+              )}
             </ActionPanel.Section>
             <ActionPanel.Section title="Organize">
               <Action
@@ -207,7 +257,14 @@ export default function Command(props: LaunchProps) {
         isLoadingRoots || isLoadingSkills || isLoadingUsage || isLoadingPins
       }
       isShowingDetail
-      searchBarPlaceholder="Search skills by name or description…"
+      navigationTitle={
+        isMulti ? `${selected.length} skills selected` : undefined
+      }
+      searchBarPlaceholder={
+        isMulti
+          ? `${selected.length} selected · ⌘↵ toggle · ↵ copy combined prompt`
+          : "Search skills by name or description…"
+      }
     >
       {skills.length === 0 && !isLoadingSkills ? (
         <List.EmptyView
