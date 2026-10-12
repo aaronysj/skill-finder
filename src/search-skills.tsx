@@ -146,7 +146,7 @@ export default function Command(props: LaunchProps) {
             markdown={
               (skill.body ||
                 `# ${skill.name}\n\n${skill.description || "*No content*"}`) +
-              `\n\n---\n\n- **Directory** \`${skill.dir}\`\n- **Used** ${usage[skill.dir] ?? 0}×`
+              `\n\n---\n\n- **Directory** \`${tildify(skill.dir)}\`\n- **Used** ${usage[skill.dir] ?? 0}×`
             }
           />
         }
