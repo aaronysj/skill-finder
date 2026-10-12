@@ -140,7 +140,6 @@ export default function Command(props: LaunchProps) {
       <List.Item
         key={skill.dir}
         title={skill.name}
-        accessories={isPinned ? [{ icon: "📌", tooltip: "Pinned" }] : []}
         keywords={[skill.name, skill.description, skill.group, skill.dir]}
         detail={
           <List.Item.Detail
