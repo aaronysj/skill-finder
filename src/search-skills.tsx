@@ -178,7 +178,7 @@ export default function Command(props: LaunchProps) {
               />
               <Action.CopyToClipboard
                 title="Copy Path Only"
-                content={skill.dir}
+                content={tildify(skill.dir)}
                 shortcut={Keyboard.Shortcut.Common.CopyName}
               />
             </ActionPanel.Section>
