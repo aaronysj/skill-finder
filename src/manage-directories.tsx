@@ -8,6 +8,7 @@ import {
   List,
   showToast,
   Toast,
+  Clipboard,
   getSelectedFinderItems,
 } from "@raycast/api";
 import { showFailureToast, usePromise } from "@raycast/utils";
@@ -69,6 +70,13 @@ export function ManageDirectories({
       .then((items) => items.map((i) => i.path).filter(isDir))
       .catch(() => [] as string[]),
   );
+
+  const { data: clipboardDir } = usePromise(async () => {
+    const text = ((await Clipboard.readText()) ?? "").trim();
+    if (!/^[/~]/.test(text) || text.includes("\n")) return undefined;
+    const dir = path.resolve(expandHome(text));
+    return isDir(dir) ? dir : undefined;
+  });
 
   const [searchText, setSearchText] = useState("");
   const query = searchText.trim();
@@ -185,7 +193,13 @@ export function ManageDirectories({
   );
 
   const known = new Set(roots.map((r) => r.dir));
-  const addable = finderDirs.filter((d) => !known.has(d));
+  const addable = [
+    ...finderDirs.map((dir) => ({ dir, from: "Selected in Finder" })),
+    ...(clipboardDir ? [{ dir: clipboardDir, from: "From clipboard" }] : []),
+  ].filter(
+    (c, i, all) =>
+      !known.has(c.dir) && all.findIndex((o) => o.dir === c.dir) === i,
+  );
   const visible =
     repoUrl || pathInput
       ? []
@@ -260,18 +274,18 @@ export function ManageDirectories({
           )}
         </List.Section>
       )}
-      {!repoUrl && !pathInput && (
+      {!repoUrl && !pathInput && !query && addable.length > 0 && (
         <List.Section title="Add">
-          {addable.map((dir) => (
+          {addable.map(({ dir, from }) => (
             <List.Item
               key={dir}
               icon={{ source: Icon.PlusCircle, tintColor: Color.Purple }}
               title={`Add ${path.basename(dir)}`}
-              subtitle={`Selected in Finder · ${tildify(path.dirname(dir))}`}
+              subtitle={`${from} · ${tildify(path.dirname(dir))}`}
               actions={
                 <ActionPanel>
                   <Action
-                    title="Add Finder Selection"
+                    title="Add Directory"
                     icon={Icon.Plus}
                     onAction={() => add(dir)}
                   />
@@ -279,13 +293,6 @@ export function ManageDirectories({
               }
             />
           ))}
-          {addable.length === 0 && !query && (
-            <List.Item
-              icon={{ source: Icon.PlusCircle, tintColor: Color.SecondaryText }}
-              title="Add a directory"
-              subtitle="Paste a path in the search bar, or select a folder in Finder first"
-            />
-          )}
         </List.Section>
       )}
       {custom.length > 0 && (
